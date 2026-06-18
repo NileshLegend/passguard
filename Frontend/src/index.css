@@ -1,0 +1,45 @@
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+
+body {
+  background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+  min-height: 100vh;
+  color: #f1f1f1;
+}
+
+input {
+  width: 100%;
+  background: rgba(255,255,255,0.1);
+  border: 2px solid rgba(255,255,255,0.1);
+  color: #f1f1f1;
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  outline: none;
+  margin-bottom: 1rem;
+}
+
+input:focus { border-color: #e94560; }
+
+button {
+  width: 100%;
+  padding: 0.8rem;
+  background: #e94560;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button:hover { background: #c73652; }
+
+.card {
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(8px);
+  border-radius: 20px;
+  padding: 2rem;
+}
+
+.error { color: #e94560; margin-bottom: 1rem; font-size: 0.9rem; }
+.link { color: #e94560; cursor: pointer; text-decoration: underline; }
