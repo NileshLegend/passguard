@@ -5,6 +5,7 @@ const pool = require('./db');
 
 const authRoutes = require('./routes/auth');
 const checkRoutes = require('./routes/checks');
+const vaultRoutes = require('./routes/vault');
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use('/auth', authRoutes);
 app.use('/checks', checkRoutes);
+app.use('/vault', vaultRoutes);
 
 app.get('/', (req, res) => res.json({ message: 'PassGuard API running' }));
 
@@ -36,6 +38,14 @@ pool.query(`
     user_id INTEGER REFERENCES users(id),
     score INTEGER,
     crack_time VARCHAR(100),
+    created_at TIMESTAMP DEFAULT NOW()
+  );
+  CREATE TABLE IF NOT EXISTS vault (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    site_name VARCHAR(255) NOT NULL,
+    username VARCHAR(255) NOT NULL,
+    password_encrypted TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
   );
 `).then(() => console.log('Tables ready'));
