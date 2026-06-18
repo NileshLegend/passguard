@@ -7,7 +7,10 @@ const authRoutes = require('./routes/auth');
 const checkRoutes = require('./routes/checks');
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: 'https://passguard-delta.vercel.app',
+  credentials: true
+}));
 app.use(express.json());
 
 // Create tables on startup
