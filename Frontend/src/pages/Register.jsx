@@ -10,7 +10,7 @@ export default function Register({ setToken }) {
 
   const handleRegister = async () => {
     try {
-      const res = await axios.post('https://passguard-production-61c4.up.railway.app/auth/register', { email, password })
+      const res = await axios.post('https://passguard-production-2c0c.up.railway.app', { email, password })
       localStorage.setItem('token', res.data.token)
       setToken(res.data.token)
       navigate('/dashboard')
