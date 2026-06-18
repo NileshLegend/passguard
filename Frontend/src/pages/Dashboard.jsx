@@ -23,7 +23,6 @@ const API = 'https://passguard-production-2c0c.up.railway.app'
 
 export default function Dashboard({ token, setToken }) {
   const [password, setPassword] = useState('')
-  const [history, setHistory] = useState([])
   const [vault, setVault] = useState([])
   const [siteName, setSiteName] = useState('')
   const [username, setUsername] = useState('')
@@ -36,20 +35,8 @@ export default function Dashboard({ token, setToken }) {
   const headers = { Authorization: `Bearer ${token}` }
 
   useEffect(() => {
-    axios.get(`${API}/checks`, { headers }).then(res => setHistory(res.data))
     axios.get(`${API}/vault`, { headers }).then(res => setVault(res.data))
   }, [])
-
-  const handleCheck = async () => {
-    if (!password) return
-    await axios.post(`${API}/checks`,
-      { score, crack_time: getCrackTime(score) },
-      { headers }
-    )
-    const res = await axios.get(`${API}/checks`, { headers })
-    setHistory(res.data)
-    setPassword('')
-  }
 
   const handleSaveVault = async () => {
     if (!siteName || !username || !vaultPassword) return
@@ -102,7 +89,6 @@ export default function Dashboard({ token, setToken }) {
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
         <button style={tabStyle('checker')} onClick={() => setActiveTab('checker')}>🔍 Checker</button>
         <button style={tabStyle('vault')} onClick={() => setActiveTab('vault')}>🔐 Vault</button>
-        <button style={tabStyle('history')} onClick={() => setActiveTab('history')}>📋 History</button>
       </div>
 
       {/* Checker Tab */}
@@ -118,14 +104,13 @@ export default function Dashboard({ token, setToken }) {
               {labels[score]} — cracks in {getCrackTime(score)}
             </p>
           </>}
-          <button onClick={handleCheck}>Save Result</button>
+          <button onClick={() => setPassword('')} style={{ background: 'rgba(255,255,255,0.1)' }}>Clear</button>
         </div>
       )}
 
       {/* Vault Tab */}
       {activeTab === 'vault' && (
         <div>
-          {/* Add new password */}
           <div className="card" style={{ marginBottom: '1.5rem' }}>
             <h3 style={{ marginBottom: '1rem' }}>➕ Save New Password</h3>
             <input placeholder="Site name (e.g. Facebook)" value={siteName} onChange={e => setSiteName(e.target.value)} />
@@ -134,7 +119,6 @@ export default function Dashboard({ token, setToken }) {
             <button onClick={handleSaveVault}>Save Password</button>
           </div>
 
-          {/* Saved passwords */}
           <div className="card">
             <h3 style={{ marginBottom: '1rem' }}>🔐 Saved Passwords</h3>
             {vault.length === 0 && <p style={{ opacity: 0.6 }}>No passwords saved yet.</p>}
@@ -156,21 +140,6 @@ export default function Dashboard({ token, setToken }) {
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* History Tab */}
-      {activeTab === 'history' && (
-        <div className="card">
-          <h3 style={{ marginBottom: '1rem' }}>📋 Recent Checks</h3>
-          {history.length === 0 && <p style={{ opacity: 0.6 }}>No checks yet.</p>}
-          {history.map(item => (
-            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.7rem 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <span style={{ color: colors[item.score] }}>{labels[item.score]}</span>
-              <span style={{ opacity: 0.6, fontSize: '0.85rem' }}>cracks in {item.crack_time}</span>
-              <span style={{ opacity: 0.5, fontSize: '0.8rem' }}>{new Date(item.created_at).toLocaleDateString()}</span>
-            </div>
-          ))}
         </div>
       )}
     </div>
