@@ -10,7 +10,7 @@ export default function Login({ setToken }) {
 
   const handleLogin = async () => {
     try {
-      const res = await axios.post('https://passguard-production-61c4.up.railway.app', { email, password })
+      const res = await axios.post('https://passguard-production-2c0c.up.railway.app', { email, password })
       localStorage.setItem('token', res.data.token)
       setToken(res.data.token)
       navigate('/dashboard')
