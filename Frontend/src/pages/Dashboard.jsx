@@ -27,14 +27,14 @@ export default function Dashboard({ token, setToken }) {
   const score = checkStrength(password)
 
   useEffect(() => {
-    axios.get('https://passguard-production-2c0c.up.railway.app', {
+    axios.get('https://passguard-production-2c0c.up.railway.app/checks', {
       headers: { Authorization: `Bearer ${token}` }
     }).then(res => setHistory(res.data))
   }, [])
 
   const handleCheck = async () => {
     if (!password) return
-    await axios.post('https://passguard-production-2c0c.up.railway.app',
+    axios.post('https://passguard-production-2c0c.up.railway.app/checks',
       { score, crack_time: getCrackTime(score) },
       { headers: { Authorization: `Bearer ${token}` } }
     )
