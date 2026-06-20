@@ -68,7 +68,7 @@ export default function Dashboard({ token, setToken }) {
 
   const tabStyle = (tab) => ({
     padding: '0.6rem 1.5rem',
-    background: activeTab === tab ? '#e94560' : 'rgba(255,255,255,0.05)',
+    background: activeTab === tab ? '#28a745' : 'rgba(255,255,255,0.05)',
     border: 'none',
     borderRadius: '8px',
     color: 'white',
