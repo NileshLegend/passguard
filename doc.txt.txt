@@ -1,0 +1,867 @@
+================================================================================
+                    PASSGUARD - COMPLETE PROJECT DOCUMENTATION
+================================================================================
+
+Project Name : PassGuard
+Type         : Full-Stack Web + Mobile Application (Password Security Platform)
+Author       : Nilesh Khawas
+Version      : 1.0.0
+Live Web App : https://passguard-delta.vercel.app
+Live API     : https://passguard-production-2c0c.up.railway.app
+Source Code  : https://github.com/NileshLegend/passguard
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+
+1.  Introduction & Purpose
+2.  Problem Statement
+3.  Who This Document Is For
+4.  System Overview
+5.  System Architecture
+6.  Technology Stack
+7.  Database Design
+8.  Backend Documentation (API Reference)
+9.  Frontend Documentation (Web - React)
+10. Mobile Documentation (Flutter)
+11. Authentication & Security Model
+12. Encryption Model (Vault)
+13. Deployment Architecture
+14. CI/CD Pipeline
+15. Environment Variables Reference
+16. Folder Structure
+17. End-User Guide (How To Use PassGuard)
+18. Setup Guide (How To Run This Project Locally)
+19. Known Limitations
+20. Future Improvements
+21. Glossary of Terms
+22. Closing Notes
+
+================================================================================
+1. INTRODUCTION & PURPOSE
+================================================================================
+
+PassGuard is a full-stack password security platform that allows users to:
+
+  - Check the strength of any password in real time
+  - Register a personal account secured with industry-standard password hashing
+  - Save website credentials (site name, username, password) into an encrypted
+    personal vault
+  - View, reveal, and delete saved vault entries
+  - Access all of the above from both a website and an Android mobile app,
+    backed by the same shared database
+
+The project was built as a capstone demonstration of full-stack engineering:
+frontend development, backend API design, relational database design, mobile
+development, authentication, encryption, and cloud deployment, all working
+together as one coherent product rather than disconnected exercises.
+
+================================================================================
+2. PROBLEM STATEMENT
+================================================================================
+
+Most people reuse the same weak password across multiple accounts because
+remembering many strong, unique passwords is difficult. This leads to:
+
+  - Higher risk of account takeover if one site is breached (credential
+    stuffing attacks)
+  - No easy way to judge whether a password is actually "strong"
+  - No centralized, secure place to store credentials without relying on
+    browser-only password managers tied to one device
+
+PassGuard addresses this by giving the user:
+  1. An instant, visual strength check for any password they type
+  2. A personal encrypted vault accessible from both web and mobile, so
+     credentials are not duplicated or lost across devices
+
+================================================================================
+3. WHO THIS DOCUMENT IS FOR
+================================================================================
+
+This document serves two audiences:
+
+  A) DEVELOPERS / MAINTAINERS - anyone who needs to understand, run, modify,
+     or extend the codebase. Sections 5-16 and 18-20 are most relevant.
+
+  B) END USERS - anyone who simply wants to use the live application.
+     Section 17 (End-User Guide) is written specifically for this audience
+     and assumes no technical background.
+
+================================================================================
+4. SYSTEM OVERVIEW
+================================================================================
+
+PassGuard is composed of three independent "client" applications that all
+communicate with one shared backend and one shared database:
+
+  - A React web application (used in browsers, desktop or mobile)
+  - A Flutter mobile application (compiled into an Android APK)
+  - A Node.js/Express backend API (the single source of truth for all logic)
+  - A PostgreSQL database (the single source of truth for all data)
+
+Because both clients talk to the same backend, any password saved on the
+website immediately appears on the mobile app and vice versa - there is no
+data duplication or syncing logic required, because there is only ever one
+copy of the data, stored centrally.
+
+================================================================================
+5. SYSTEM ARCHITECTURE
+================================================================================
+
+                     ┌─────────────────────┐
+                     │   React Web App     │
+                     │  (Vercel hosting)   │
+                     └──────────┬──────────┘
+                                │  HTTPS / REST (JSON)
+                                │
+                     ┌──────────▼──────────┐
+                     │  Flutter Mobile App │
+                     │   (Android APK)     │──────┐
+                     └─────────────────────┘      │ HTTPS / REST (JSON)
+                                                   │
+                                        ┌──────────▼──────────┐
+                                        │   Node.js + Express  │
+                                        │   Backend API         │
+                                        │   (Railway hosting)   │
+                                        └──────────┬────────────┘
+                                                   │ SQL queries (pg driver)
+                                                   │
+                                        ┌──────────▼────────────┐
+                                        │   PostgreSQL Database  │
+                                        │   (Railway hosting)    │
+                                        └─────────────────────────┘
+
+ARCHITECTURAL STYLE: Monolith
+
+The backend is built as a single deployable Node.js application (a "monolith")
+rather than separate microservices. All routes (auth, password checks, vault)
+live in one Express app. This was a deliberate choice:
+
+  - The project's scale does not justify the operational overhead of
+    microservices (separate deployments, inter-service networking, etc.)
+  - A monolith is faster to build, debug, and deploy for a small team (or
+    solo developer) and a 2-day timeline
+  - It remains easy to split into microservices later if the application
+    grows, since routes are already organized into separate files
+    (auth.js, checks.js, vault.js)
+
+CLIENT-SERVER MODEL
+
+Both the React app and Flutter app are "clients" - they never talk to the
+database directly. Every piece of data displayed on screen was requested
+from the backend over HTTPS. This separation means:
+
+  - The database credentials are never exposed to the public internet
+  - All business logic (password hashing, encryption, validation) lives in
+    one place, not duplicated across two frontends
+  - Either frontend could be replaced entirely without touching the backend
+
+================================================================================
+6. TECHNOLOGY STACK
+================================================================================
+
+  LAYER          | TECHNOLOGY            | PURPOSE
+  ---------------|------------------------|----------------------------------
+  Frontend (Web) | React (Vite)           | User interface in the browser
+  Frontend (Web) | React Router           | Page navigation (Login/Register/
+                 |                        | Dashboard) without full reloads
+  Frontend (Web) | Axios                  | Sending HTTP requests to backend
+  Mobile         | Flutter (Dart)         | Cross-platform mobile UI
+  Mobile         | http package           | Sending HTTP requests to backend
+  Mobile         | shared_preferences     | Storing the login token on-device
+  Backend        | Node.js                | JavaScript runtime for the server
+  Backend        | Express.js             | Web framework for routing & API
+  Backend        | bcryptjs               | One-way password hashing
+  Backend        | jsonwebtoken (JWT)     | Stateless authentication tokens
+  Backend        | crypto-js (AES)        | Two-way encryption for vault data
+  Backend        | cors                   | Controlling cross-origin access
+  Backend        | dotenv                 | Loading secret config from .env
+  Database       | PostgreSQL             | Relational data storage
+  Database       | pg (node-postgres)     | Raw SQL driver (no ORM used)
+  Hosting (Web)  | Vercel                 | Hosting the React build
+  Hosting (API)  | Railway                | Hosting the Node.js API + DB
+  Version Control| Git & GitHub           | Source code history & backup
+  CI/CD          | GitHub Actions         | Automated build verification
+
+NOTE ON ORM: This project intentionally uses raw parameterized SQL queries
+through the `pg` library instead of an ORM (such as Sequelize or Prisma).
+This was a deliberate choice to keep full visibility and control over every
+query, and to keep the dependency list minimal for a small project.
+
+================================================================================
+7. DATABASE DESIGN
+================================================================================
+
+The database is relational, consisting of three tables, all hosted on a
+PostgreSQL instance provisioned by Railway.
+
+TABLE: users
+  -----------------------------------------------------------------------
+  Column          | Type          | Notes
+  -----------------------------------------------------------------------
+  id              | SERIAL        | Primary key, auto-incrementing
+  email           | VARCHAR(255)  | Unique, used as the login identifier
+  password_hash   | VARCHAR(255)  | bcrypt hash - the real password is
+                  |               | never stored anywhere
+  created_at      | TIMESTAMP     | Defaults to NOW()
+
+TABLE: password_checks
+  -----------------------------------------------------------------------
+  Column          | Type          | Notes
+  -----------------------------------------------------------------------
+  id              | SERIAL        | Primary key
+  user_id         | INTEGER       | Foreign key -> users.id
+  score           | INTEGER       | Strength score (0-4)
+  crack_time      | VARCHAR(100)  | Human-readable estimate
+  created_at      | TIMESTAMP     | Defaults to NOW()
+
+  (Note: this table and its related endpoints were built during
+  development but the "save result" feature was later removed from the
+  user-facing UI by product decision - see Section 19.)
+
+TABLE: vault
+  -----------------------------------------------------------------------
+  Column              | Type          | Notes
+  -----------------------------------------------------------------------
+  id                  | SERIAL        | Primary key
+  user_id             | INTEGER       | Foreign key -> users.id
+  site_name           | VARCHAR(255)  | e.g. "Facebook", "Gmail"
+  username            | VARCHAR(255)  | The login username/email for that site
+  password_encrypted  | TEXT          | AES-encrypted password (never plain)
+  created_at          | TIMESTAMP     | Defaults to NOW()
+
+RELATIONSHIPS
+
+  users (1) ────────< (many) password_checks
+  users (1) ────────< (many) vault
+
+This is a one-to-many relationship: a single user can have many password
+checks and many vault entries, but every row in those two tables belongs to
+exactly one user, enforced by the `user_id` foreign key referencing
+`users(id)`.
+
+WHY NO PLAIN-TEXT PASSWORDS ANYWHERE: The `users` table never stores the
+literal login password, only its bcrypt hash. The `vault` table never stores
+a vault password in plain text, only its AES-encrypted form. This is the
+single most important security decision in the schema.
+
+================================================================================
+8. BACKEND DOCUMENTATION (API REFERENCE)
+================================================================================
+
+Base URL: https://passguard-production-2c0c.up.railway.app
+
+--------------------------------------------------------------------------
+8.1 AUTH ROUTES (/auth)
+--------------------------------------------------------------------------
+
+POST /auth/register
+  Purpose : Create a new user account
+  Body    : { "email": string, "password": string }
+  Process :
+    1. Receives email + plain password from client
+    2. Hashes the password using bcrypt (10 salt rounds)
+    3. Inserts email + hash into the `users` table
+    4. Generates a JWT containing the new user's id
+    5. Returns the token + basic user info
+  Response: { "token": "...", "user": { "id": 1, "email": "..." } }
+  Errors  : 400 if email already exists
+
+POST /auth/login
+  Purpose : Authenticate an existing user
+  Body    : { "email": string, "password": string }
+  Process :
+    1. Looks up the user by email
+    2. Compares the submitted password against the stored bcrypt hash
+       using bcrypt.compare() (never decrypts, only compares hashes)
+    3. If valid, generates and returns a new JWT
+  Response: { "token": "...", "user": { "id": 1, "email": "..." } }
+  Errors  : 400 if user not found or password incorrect
+
+--------------------------------------------------------------------------
+8.2 VAULT ROUTES (/vault) - all require a valid JWT
+--------------------------------------------------------------------------
+
+Every vault route is protected by an `auth` middleware function. This
+function runs BEFORE the actual route logic:
+
+  1. Reads the Authorization header, expects format: "Bearer <token>"
+  2. Verifies the token's signature using jwt.verify() and the server's
+     JWT_SECRET
+  3. If invalid or missing -> immediately responds 401 Unauthorized and the
+     route handler code never executes
+  4. If valid -> attaches the decoded user id to req.user.id and calls
+     next() to proceed to the actual route handler
+
+POST /vault
+  Purpose : Save a new vault entry (a site + username + password)
+  Headers : Authorization: Bearer <token>
+  Body    : { "site_name": string, "username": string, "password": string }
+  Process :
+    1. Validates all three fields are present
+    2. Encrypts the password using AES (crypto-js), using ENCRYPTION_KEY
+    3. Inserts the encrypted password (never the plain one) into `vault`
+  Response: the newly created row (id, site_name, username, created_at)
+
+GET /vault
+  Purpose : Retrieve all saved vault entries for the logged-in user
+  Headers : Authorization: Bearer <token>
+  Process :
+    1. Queries all vault rows where user_id matches the token's user
+    2. Decrypts each password_encrypted value back to plain text using the
+       same ENCRYPTION_KEY, server-side, just before sending the response
+  Response: array of { id, site_name, username, password, created_at }
+
+DELETE /vault/:id
+  Purpose : Delete a specific vault entry
+  Headers : Authorization: Bearer <token>
+  Process :
+    1. Deletes the row matching both the given id AND the logged-in user's
+       id (this prevents User A from deleting User B's entries even if
+       they guessed the id)
+  Response: { "message": "Deleted" }
+
+--------------------------------------------------------------------------
+8.3 MISC
+--------------------------------------------------------------------------
+
+GET /
+  Purpose : Health check - confirms the API is online
+  Response: { "message": "PassGuard API running" }
+
+================================================================================
+9. FRONTEND DOCUMENTATION (WEB - REACT)
+================================================================================
+
+Built using React + Vite. Structured into pages, each responsible for one
+screen of the application.
+
+FILE: src/main.jsx
+  Entry point. Mounts the root <App /> component into the HTML page.
+
+FILE: src/App.jsx
+  Defines client-side routing using React Router:
+    /login      -> <Login />
+    /register   -> <Register />
+    /dashboard  -> <Dashboard /> (only reachable if a token exists)
+    /           -> redirects based on login state
+  Holds the `token` state at the top level and passes it down as a prop,
+  which is the simplest form of state-sharing in React without needing a
+  global state library.
+
+FILE: src/pages/Login.jsx
+  - Two controlled inputs (email, password) via useState
+  - On submit, calls POST /auth/login via axios
+  - On success: saves token to localStorage, updates app state, redirects
+    to /dashboard
+  - On failure: displays the server's error message
+
+FILE: src/pages/Register.jsx
+  - Identical structure to Login.jsx but calls POST /auth/register
+
+FILE: src/pages/Dashboard.jsx
+  - The main app screen, split into two tabs (Checker, Vault) using a
+    single `activeTab` state variable and conditional rendering
+  - CHECKER TAB: runs a local JavaScript function `checkStrength()` that
+    scores a password 0-4 based on length, casing, numbers, and special
+    characters. This runs entirely in the browser - no API call needed,
+    so feedback is instant as the user types.
+  - VAULT TAB: on mount (useEffect), fetches all vault entries via
+    GET /vault. Provides a form to add a new entry (POST /vault), a
+    per-entry Show/Hide toggle that only changes local UI state (the
+    decrypted password is already in memory after the GET request, so no
+    extra request is needed to "reveal" it), and a Delete button
+    (DELETE /vault/:id).
+
+STYLING: A single global stylesheet (index.css) defines the color palette,
+input/button styling, and the reusable `.card` class used throughout, which
+keeps the visual design consistent across every screen without repeating
+CSS in every component.
+
+================================================================================
+10. MOBILE DOCUMENTATION (FLUTTER)
+================================================================================
+
+Built using Flutter/Dart, compiled to a single Android APK. The mobile app
+talks to the exact same backend API as the web app.
+
+FILE: lib/main.dart contains all screens in one file, structured as:
+
+  AuthWrapper
+    - Runs on app start
+    - Checks SharedPreferences (Flutter's on-device key-value storage) for
+      a previously saved token
+    - If found -> shows DashboardScreen directly (user stays logged in
+      between app launches)
+    - If not found -> shows LoginScreen
+
+  LoginScreen
+    - A single screen that toggles between "Login" and "Register" mode
+    - Sends requests to /auth/login or /auth/register using the `http`
+      package
+    - On success, saves the token into SharedPreferences via a callback
+
+  DashboardScreen
+    - Holds the tab state (Checker / Vault) and the logout function
+    - Fetches vault data once when it loads
+
+  CheckerTab
+    - Dart re-implementation of the exact same strength-checking logic
+      used in the React web app (same rules: length, case mix, digits,
+      symbols), so the user gets identical scoring on both platforms
+
+  VaultTab
+    - Mirrors the React Vault tab: add new entry, list entries, show/hide
+      password, delete entry - all calling the same /vault endpoints
+
+WHY ONE FILE: For a project of this size, keeping all screens in
+main.dart was a pragmatic choice to minimize file-navigation overhead
+during a tight 2-day build. In a larger production app, each screen/widget
+would normally be split into its own file under a `screens/` or
+`widgets/` folder.
+
+ANDROID CONFIGURATION NOTES:
+  - AndroidManifest.xml requires `<uses-permission
+    android:name="android.permission.INTERNET"/>` for the app to make any
+    network request at all
+  - `android:usesCleartextTraffic="true"` was added during development to
+    rule out a networking issue, though the API is served entirely over
+    HTTPS
+  - App icon was generated using the `flutter_launcher_icons` package from
+    a single source image, which auto-generates every required resolution
+
+iOS: This project does not include an iOS build. Compiling and signing an
+iOS app requires macOS with Xcode installed, and on-device distribution
+requires a paid Apple Developer account - neither of which was available
+for this project. The Flutter codebase itself is platform-agnostic and
+could be compiled for iOS given access to that environment.
+
+================================================================================
+11. AUTHENTICATION & SECURITY MODEL
+================================================================================
+
+PASSWORD HASHING (bcrypt)
+  When a user registers, their password is passed through bcrypt's
+  hashing function before ever touching the database. Hashing is one-way:
+  there is no function to turn a hash back into the original password.
+  When a user logs in later, the backend does not "decrypt" anything - it
+  hashes the submitted password again and compares the two hashes. If they
+  match, the password was correct.
+
+JWT (JSON Web Tokens) - STATELESS AUTHENTICATION
+  After a successful login or registration, the backend generates a JWT: a
+  signed string containing the user's id, signed with a secret key
+  (JWT_SECRET) that only the server knows. The client stores this token
+  and includes it in the Authorization header of every subsequent
+  request. The server verifies the signature on each request to confirm
+  the token hasn't been tampered with, and extracts the user id from it.
+
+  This is called "stateless" authentication because the server does not
+  need to store a list of "who is logged in" anywhere (unlike traditional
+  session-based auth, which stores session data server-side). The token
+  itself is the proof.
+
+  TRADE-OFF: because the token is not stored server-side, the server
+  cannot "force log out" a single token early - it remains valid until it
+  expires. (See Section 19 - this project's tokens currently have no
+  expiry set, which is a known limitation.)
+
+MIDDLEWARE-BASED ROUTE PROTECTION
+  All vault routes pass through an authentication middleware before
+  reaching their actual logic. This ensures unauthenticated requests are
+  rejected before any database query ever runs, rather than checking
+  permissions partway through business logic.
+
+CORS (Cross-Origin Resource Sharing)
+  The backend explicitly sets which origins are allowed to call its API.
+  During development this was set to the specific Vercel domain, and was
+  later opened to allow all origins ("*") to support requests coming from
+  the Flutter mobile app (which does not have a fixed "origin" the way a
+  browser does). This is a deliberate trade-off explained further in
+  Section 19.
+
+SQL INJECTION PROTECTION
+  All database queries use parameterized queries (placeholders like $1,
+  $2 with a separate values array) via the `pg` library, rather than
+  building raw SQL strings with string concatenation. This means user
+  input is never directly inserted into a SQL command, which is the
+  standard defense against SQL injection attacks.
+
+================================================================================
+12. ENCRYPTION MODEL (VAULT)
+================================================================================
+
+The vault feature stores real website passwords on behalf of the user,
+which is more sensitive than the login password itself, so it cannot use
+one-way hashing - the user needs to see the original password again later.
+
+This project uses AES (Advanced Encryption Standard) symmetric encryption
+via the crypto-js library:
+
+  ENCRYPTING (on save):
+    encrypted = CryptoJS.AES.encrypt(plainPassword, ENCRYPTION_KEY)
+    -> only the encrypted string is stored in the database
+
+  DECRYPTING (on retrieval):
+    plainPassword = CryptoJS.AES.decrypt(encrypted, ENCRYPTION_KEY)
+    -> happens server-side, only just before sending the response back
+       to an authenticated, verified user
+
+KEY DETAIL: ENCRYPTION_KEY is a secret string stored as an environment
+variable on the server (never committed to source control), separate from
+JWT_SECRET. The same key is currently used for every user's vault data
+(see Section 19 for the limitation this introduces and how it could be
+improved with per-user keys).
+
+================================================================================
+13. DEPLOYMENT ARCHITECTURE
+================================================================================
+
+FRONTEND (React) -> VERCEL
+  - Connected directly to the GitHub repository
+  - Root directory set to `frontend` so Vercel only builds that subfolder
+  - Vercel auto-detects the Vite framework and runs the build automatically
+  - Every push to the main branch triggers an automatic redeploy
+  - Provides a public HTTPS URL automatically, no manual SSL configuration
+
+BACKEND (Node.js) -> RAILWAY
+  - Connected to the same GitHub repository
+  - Root directory set to the backend subfolder (case-sensitive - this
+    caused a real deployment failure during development until corrected
+    to match the exact folder casing in the repo)
+  - Railway auto-detects it's a Node.js project (via Railpack) and builds
+    a container without a manually written Dockerfile
+  - A PostgreSQL database was provisioned as a separate Railway service
+    within the same project
+  - Environment variables (database credentials, JWT secret, encryption
+    key) are set directly in Railway's dashboard, not in any file that
+    gets committed to GitHub
+  - A public domain with HTTPS is generated for the backend service,
+    which is the URL both the web and mobile clients call
+
+DATABASE (PostgreSQL) -> RAILWAY
+  - Hosted as a managed Railway service
+  - The backend connects to it using a connection string / individual
+    credential variables injected as environment variables
+  - Tables are created automatically on server startup using
+    `CREATE TABLE IF NOT EXISTS` statements in server.js, so no manual
+    migration step is required for this project's scale
+
+MOBILE (Flutter) -> ANDROID APK
+  - Built locally using `flutter build apk --release`
+  - Produces a standalone .apk file that can be installed directly on any
+    Android device without going through the Google Play Store
+  - The APK is hardcoded to point at the live Railway backend URL, so it
+    works on any network without needing a local server running
+
+================================================================================
+14. CI/CD PIPELINE
+================================================================================
+
+A GitHub Actions workflow file exists at .github/workflows/deploy.yml and
+runs automatically on every push to the `main` branch. Its current steps:
+
+  1. Checks out the repository code
+  2. Sets up a Node.js environment
+  3. Installs backend dependencies (npm install)
+  4. Installs frontend dependencies (npm install)
+  5. Builds the frontend (npm run build) to confirm it compiles without
+     errors
+
+PURPOSE: This acts as an automated safety check - if a code change breaks
+the frontend build, the workflow fails and is visible in the GitHub
+"Actions" tab before it could cause a problem in production. This is a
+basic but genuine CI (Continuous Integration) pipeline. Actual deployment
+(CD) to Vercel/Railway happens through their own GitHub integrations
+rather than from within this workflow file.
+
+================================================================================
+15. ENVIRONMENT VARIABLES REFERENCE
+================================================================================
+
+  These exist on the BACKEND only and are never committed to GitHub
+  (excluded via .gitignore):
+
+  Variable       | Purpose
+  ---------------|----------------------------------------------------------
+  PORT           | Which port the Express server listens on
+  DB_HOST        | PostgreSQL host address
+  DB_NAME        | Database name
+  DB_USER        | Database username
+  DB_PASSWORD    | Database password
+  DB_PORT        | Database port (default 5432)
+  DATABASE_URL   | Full connection string (used as an alternative to the
+                 | individual DB_ variables above, required for Railway's
+                 | public proxy connection)
+  JWT_SECRET     | Secret key used to sign and verify login tokens
+  ENCRYPTION_KEY | Secret key used to encrypt/decrypt vault passwords
+
+================================================================================
+16. FOLDER STRUCTURE
+================================================================================
+
+PassGuard/
+├── Backend/
+│   ├── node_modules/        (installed dependencies, not committed)
+│   ├── routes/
+│   │   ├── auth.js          (register & login endpoints)
+│   │   ├── checks.js        (password-check history endpoints)
+│   │   └── vault.js         (vault save/get/delete endpoints)
+│   ├── .env                 (secret config, not committed)
+│   ├── db.js                (PostgreSQL connection setup)
+│   ├── package.json         (dependencies & start scripts)
+│   └── server.js            (app entry point, CORS, table creation)
+│
+├── Frontend/
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── Login.jsx
+│   │   │   ├── Register.jsx
+│   │   │   └── Dashboard.jsx
+│   │   ├── App.jsx          (routing)
+│   │   ├── index.css        (global styling)
+│   │   └── main.jsx          (entry point)
+│   └── package.json
+│
+├── Mobile/
+│   └── passguard_mobile/
+│       ├── lib/
+│       │   └── main.dart    (entire Flutter app)
+│       ├── android/         (Android-specific config, manifest, icons)
+│       └── pubspec.yaml     (Flutter dependencies)
+│
+└── .github/
+    └── workflows/
+        └── deploy.yml       (CI build-check pipeline)
+
+================================================================================
+17. END-USER GUIDE (HOW TO USE PASSGUARD)
+================================================================================
+
+This section assumes no technical knowledge and explains how to use the
+live application.
+
+GETTING STARTED
+  1. Open https://passguard-delta.vercel.app in any web browser
+  2. Click "Register" and enter an email and password to create an account
+  3. You will be logged in automatically after registering
+
+CHECKING A PASSWORD'S STRENGTH
+  1. After logging in, you will land on the "Checker" tab
+  2. Type any password into the input box
+  3. A colored bar will appear instantly:
+       Red    = Very Weak
+       Orange = Weak
+       Yellow = Fair
+       Blue   = Strong
+       Green  = Very Strong
+  4. Below the bar, tips will indicate what's missing (length, uppercase
+     letters, numbers, special characters) to help you improve it
+  5. Nothing typed here is saved or sent anywhere - it is only checked
+     locally for your own reference
+
+SAVING A PASSWORD TO YOUR VAULT
+  1. Click the "Vault" tab
+  2. Fill in:
+       - Site name (e.g. "Facebook", "Gmail")
+       - Your username or email for that site
+       - The password you use on that site
+  3. Click "Save Password"
+  4. The entry will appear in the "Saved Passwords" list below, with the
+     password hidden by default
+
+VIEWING OR DELETING A SAVED PASSWORD
+  1. Click "Show" next to any saved entry to reveal the password
+  2. Click "Hide" to conceal it again
+  3. Click the delete icon to permanently remove that entry
+
+LOGGING OUT
+  Click the "Logout" button at the top of the dashboard at any time. You
+  will need to log in again to access your vault.
+
+USING THE MOBILE APP
+  If you have been given the PassGuard Android APK file:
+  1. Install it on your Android device (you may need to allow installs
+     from outside the Play Store in your phone's settings)
+  2. Open the app and log in with the SAME email and password used on the
+     website - your account and vault are shared across both
+  3. Any password you save on your phone will also appear on the website,
+     and vice versa
+
+DATA SAFETY NOTE FOR USERS
+  Your login password is never stored anywhere in readable form. Your
+  vault passwords are stored in an encrypted form and are only converted
+  back to readable text by the server at the moment you are logged in and
+  request to view them.
+
+================================================================================
+18. SETUP GUIDE (HOW TO RUN THIS PROJECT LOCALLY)
+================================================================================
+
+PREREQUISITES
+  - Node.js installed
+  - PostgreSQL installed and running locally
+  - Flutter SDK installed (only needed for mobile development)
+  - Git installed
+
+BACKEND SETUP
+  1. Navigate to the Backend folder
+  2. Run: npm install
+  3. Create a .env file with the variables listed in Section 15, pointing
+     DB_HOST/DB_USER/DB_PASSWORD/DB_NAME/DB_PORT at your local PostgreSQL
+     instance, and set your own values for JWT_SECRET and ENCRYPTION_KEY
+  4. Create the database manually: open psql and run
+       CREATE DATABASE passguard;
+  5. Run: npm start
+  6. The required tables are created automatically on first run
+  7. Confirm it's working by visiting http://localhost:5000 in a browser
+
+FRONTEND SETUP
+  1. Navigate to the Frontend folder
+  2. Run: npm install
+  3. Update the API base URL inside the page files to point at
+     http://localhost:5000 instead of the live Railway URL, for local
+     testing
+  4. Run: npm run dev
+  5. Open the local URL shown in the terminal (typically
+     http://localhost:5173)
+
+MOBILE SETUP
+  1. Navigate to Mobile/passguard_mobile
+  2. Run: flutter pub get
+  3. Update the API constant at the top of lib/main.dart to point at your
+     local backend address if testing locally (note: an Android emulator
+     cannot reach "localhost" directly - it requires the machine's local
+     network IP address instead)
+  4. Run: flutter run -d chrome (for quick browser testing) or connect a
+     physical device/emulator and run: flutter run
+
+================================================================================
+19. KNOWN LIMITATIONS
+================================================================================
+
+This section is included intentionally - acknowledging known weaknesses is
+part of responsible engineering documentation, not a flaw in the project.
+
+  1. JWT TOKENS DO NOT EXPIRE
+     Once issued, a token remains valid indefinitely. A production system
+     should set an expiry (e.g. 7 days) and support refresh tokens.
+
+  2. NO SERVER-SIDE LOGOUT / TOKEN REVOCATION
+     Because authentication is stateless, "logging out" only deletes the
+     token from the client's local storage - a previously copied token
+     would still technically work until it naturally expired (which,
+     combined with limitation #1, means indefinitely in this version).
+
+  3. NO RATE LIMITING ON LOGIN/REGISTER
+     The login and register endpoints currently accept unlimited attempts,
+     making them theoretically vulnerable to brute-force guessing. A
+     package like express-rate-limit would address this.
+
+  4. SINGLE SHARED ENCRYPTION KEY FOR ALL USERS' VAULTS
+     ENCRYPTION_KEY is one static value used to encrypt every user's vault
+     entries. If this key were ever leaked, every user's vault data could
+     be decrypted. A more robust design would derive a unique encryption
+     key per user.
+
+  5. CORS IS FULLY OPEN ("*")
+     This was necessary to allow requests from the Flutter mobile app,
+     which does not send a fixed browser-style origin header. It does mean
+     any website could technically attempt to call the API on behalf of a
+     user who already has a valid token, since token-based requests are
+     not blocked by CORS the way cookie-based sessions would be protected.
+
+  6. NO SERVER-SIDE INPUT VALIDATION LIBRARY
+     Basic presence checks exist (e.g. "all fields required"), but there
+     is no dedicated validation layer enforcing email format, password
+     complexity rules, or input length limits on the backend.
+
+  7. ERROR MESSAGES CAN LEAK ACCOUNT EXISTENCE
+     The login endpoint currently distinguishes between "user not found"
+     and "wrong password" in its responses, which allows an attacker to
+     determine whether a given email is registered (email enumeration).
+
+  8. NO IOS BUILD
+     Building and signing an iOS app requires macOS with Xcode and a paid
+     Apple Developer account for on-device installation, neither of which
+     was available during development. The Flutter codebase is otherwise
+     platform-agnostic.
+
+  9. PASSWORD-CHECK HISTORY FEATURE WAS BUILT THEN REMOVED FROM THE UI
+     An earlier version allowed saving each strength-check result with a
+     timestamp. This was deliberately removed from the user interface
+     because, on reflection, users have no practical reason to revisit a
+     log of past one-off password checks. The backend table and routes
+     for this feature still exist in the codebase but are unused by the
+     current frontend - a candidate for cleanup in a future revision.
+
+================================================================================
+20. FUTURE IMPROVEMENTS
+================================================================================
+
+  - Add JWT expiry and a refresh-token flow
+  - Add rate limiting to authentication endpoints
+  - Move from a single shared encryption key to per-user derived keys
+  - Add proper server-side input validation (e.g. using a library like
+    Joi or express-validator)
+  - Normalize login error messages to prevent account enumeration
+  - Remove the unused password_checks table and routes, or repurpose them
+  - Add automated tests (unit tests for the backend routes, widget tests
+    for Flutter)
+  - Containerize the backend with a Dockerfile for environment-independent
+    deployment instead of relying solely on Railway's auto-detection
+  - Build and sign an iOS version given access to macOS + a developer
+    account
+  - Add password generator functionality directly inside the Vault tab
+
+================================================================================
+21. GLOSSARY OF TERMS
+================================================================================
+
+  API              Application Programming Interface - the set of URLs/
+                    endpoints a backend exposes for clients to call.
+  Backend           The server-side application that handles logic and
+                    talks to the database.
+  bcrypt            A one-way password hashing algorithm.
+  CORS              Cross-Origin Resource Sharing - browser security rules
+                    governing which websites may call an API.
+  Encryption (AES)  A two-way, reversible method of scrambling data using
+                    a secret key.
+  Foreign Key       A column that links a row in one table to a row in
+                    another table, enforcing a relationship.
+  Hashing           A one-way transformation of data that cannot be
+                    reversed back to the original value.
+  JWT               JSON Web Token - a signed, stateless authentication
+                    token.
+  Middleware        Code that runs before a route's main logic, often used
+                    for authentication checks.
+  Monolith          A single, unified application codebase/deployment, as
+                    opposed to multiple independent microservices.
+  ORM               Object-Relational Mapper - a library that lets
+                    developers query a database using code objects instead
+                    of raw SQL (not used in this project by choice).
+  REST              An architectural style for designing APIs around
+                    resources and standard HTTP verbs (GET, POST, DELETE).
+  Stateless Auth    An authentication approach where the server does not
+                    store session data; the token itself proves identity.
+
+================================================================================
+22. CLOSING NOTES
+================================================================================
+
+PassGuard was designed and built end-to-end - frontend, backend, database,
+mobile app, authentication, encryption, and cloud deployment - within a
+two-day development window as a capstone project. Every architectural
+decision documented above (monolith vs. microservices, raw SQL vs. ORM,
+JWT vs. sessions, single encryption key vs. per-user keys) was a deliberate
+trade-off made under real time constraints, and is documented honestly
+here, including the limitations, rather than presented as a finished,
+flawless product.
+
+This documentation is intended to allow any future developer - or this
+project's own author, returning to it later - to understand not just WHAT
+the system does, but WHY it was built this way.
+
+================================================================================
+                                END OF DOCUMENT
+================================================================================
